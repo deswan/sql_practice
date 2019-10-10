@@ -132,3 +132,162 @@ WHERE SC1.CId = '01';
 | 06   | 01   |  31.0 | NULL | NULL |  NULL | NULL | NULL   | NULL                | NULL |
 
 1.3 查询不存在" 01 “课程但存在” 02 "课程的情况
+
+要查询不存在 01 课程的学生，比较方便的方法是使用子查询，即在 WHERE 子句中排除所有 CId 为 01 的 SId 即可，再加上另外存在课程 02 的条件即构成查询
+
+```sql
+SELECT * FROM SC
+WHERE SId not in (SELECT SId FROM SC WHERE CId = '01')
+AND CId = '02';
+```
+
+| SId  | CId  | score |
+|------|------|-------|
+| 07   | 02   |  89.0 |
+
+2. 查询平均成绩大于等于 60 分的同学的学生编号和学生姓名和平均成绩
+
+```SQL
+SELECT Student.SId, Student.Sname, avg(SC.score) FROM SC, Student
+WHERE SC.SId = Student.SId
+GROUP BY SC.SId, Student.Sname
+HAVING avg(SC.score) > 60
+```
+
+| SId  | Sname  | avg(SC.score) |
+|------|--------|---------------|
+| 01   | 赵雷   |      89.66667 |
+| 02   | 钱电   |      70.00000 |
+| 03   | 孙风   |      80.00000 |
+| 05   | 周梅   |      81.50000 |
+| 07   | 郑竹   |      93.50000 |
+
+3. 查询在 SC 表存在成绩的学生信息
+
+```sql
+SELECT Student.* FROM Student, SC
+WHERE Student.SId = SC.SId
+GROUP BY Student.SId, Student.Sname, Student.Sage, Student.Ssex
+```
+使用内连接即可过滤掉在 SC 表无数据的项， 使用 group by 去重
+
+另外也可使用 distinct 去重
+
+```sql
+SELECT distinct Student.Sid, Student.Sname FROM Student, SC
+WHERE Student.SId = SC.SId
+```
+
+| SId | Sname  | Sage                | Ssex |
+|-----|--------|---------------------|------|
+| 01  | 赵雷   | 1990-01-01 00:00:00 | 男   |
+| 02  | 钱电   | 1990-12-21 00:00:00 | 男   |
+| 03  | 孙风   | 1990-05-20 00:00:00 | 男   |
+| 04  | 李云   | 1990-08-06 00:00:00 | 男   |
+| 05  | 周梅   | 1991-12-01 00:00:00 | 女   |
+| 06  | 吴兰   | 1992-03-01 00:00:00 | 女   |
+| 07  | 郑竹   | 1989-07-01 00:00:00 | 女   |
+
+4. 查询所有同学的学生编号、学生姓名、选课总数、所有课程的总成绩(没成绩的显示为 null )
+
+由于要列出所有学生，而有些学生在选课表即 SC 表是没有记录的，因此要使用左连接。查询选课总数和总成绩使用 count 和 sum 函数即可。
+
+注意 count(SC.CId) 不可写为 count(*)，因为 count(*) 会把一个存在的列算作一项，而 count(SC.CId) 会排除 SC.CId 字段为 null 的项,
+如果写作 count(*)，那么没有选课的同学求出来的选课总数会是 1
+
+```sql
+SELECT Student.SId, Student.Sname, count(SC.CId), sum(SC.score) FROM Student
+LEFT JOIN SC
+ON Student.SId = SC.SId
+GROUP BY Student.SId, Student.Sname;
+```
+
+| SId | Sname  | count(SC.CId) | sum(SC.score) |
+|-----|--------|---------------|---------------|
+| 01  | 赵雷   |             3 |         269.0 |
+| 02  | 钱电   |             3 |         210.0 |
+| 03  | 孙风   |             3 |         240.0 |
+| 04  | 李云   |             3 |         100.0 |
+| 05  | 周梅   |             2 |         163.0 |
+| 06  | 吴兰   |             2 |          65.0 |
+| 07  | 郑竹   |             2 |         187.0 |
+| 09  | 张三   |             0 |          NULL |
+| 10  | 李四   |             0 |          NULL |
+| 11  | 李四   |             0 |          NULL |
+| 12  | 赵六   |             0 |          NULL |
+| 13  | 孙七   |             0 |          NULL |
+| 14  | 赵雷   |             0 |          NULL |
+
+5. 查询「李」姓老师的数量
+
+```sql
+SELECT * FROM Teacher
+WHERE Tname like '李%';
+```
+
+| TId  | Tname  |
+|------|--------|
+| 02   | 李四   |
+
+6. 查询学过「张三」老师授课的同学的信息
+
+```sql
+SELECT distinct Student.* FROM Teacher, Student, SC, Course
+WHERE Teacher.TId = Course.TId
+AND Course.CId = SC.CId
+AND Student.SId = SC.SId
+AND Teacher.Tname = '张三'
+```
+
+| SId | Sname  | Sage                | Ssex |
+|-----|--------|---------------------|------|
+| 01  | 赵雷   | 1990-01-01 00:00:00 | 男   |
+| 02  | 钱电   | 1990-12-21 00:00:00 | 男   |
+| 03  | 孙风   | 1990-05-20 00:00:00 | 男   |
+| 04  | 李云   | 1990-08-06 00:00:00 | 男   |
+| 05  | 周梅   | 1991-12-01 00:00:00 | 女   |
+| 07  | 郑竹   | 1989-07-01 00:00:00 | 女   |
+
+7. 查询没有学全所有课程的同学的信息
+
+```sql
+SELECT Student.* FROM Student
+LEFT JOIN SC
+ON SC.SId = Student.SId
+GROUP BY Student.SId, Student.Sname, Student.Ssex, Student.Sage
+HAVING count(SC.CId) < (SELECT count(*) from Course)
+```
+
+| SId | Sname  | Sage                | Ssex |
+|-----|--------|---------------------|------|
+| 05  | 周梅   | 1991-12-01 00:00:00 | 女   |
+| 06  | 吴兰   | 1992-03-01 00:00:00 | 女   |
+| 07  | 郑竹   | 1989-07-01 00:00:00 | 女   |
+| 09  | 张三   | 2017-12-20 00:00:00 | 女   |
+| 10  | 李四   | 2017-12-25 00:00:00 | 女   |
+| 11  | 李四   | 2017-12-30 00:00:00 | 女   |
+| 12  | 赵六   | 2017-01-01 00:00:00 | 女   |
+| 13  | 孙七   | 2018-01-01 00:00:00 | 女   |
+| 14  | 赵雷   | 2018-01-02 00:00:00 | 女   |
+
+8. 查询至少有一门课与学号为" 01 "的同学所学相同的同学的信息
+
+```sql
+SELECT distinct Student.* FROM Student, SC
+WHERE Student.SId = SC.SId
+AND SC.CId IN (SELECT CId FROM SC WHERE SId = '01')
+```
+
+| SId | Sname  | Sage                | Ssex |
+|-----|--------|---------------------|------|
+| 01  | 赵雷   | 1990-01-01 00:00:00 | 男   |
+| 02  | 钱电   | 1990-12-21 00:00:00 | 男   |
+| 03  | 孙风   | 1990-05-20 00:00:00 | 男   |
+| 04  | 李云   | 1990-08-06 00:00:00 | 男   |
+| 05  | 周梅   | 1991-12-01 00:00:00 | 女   |
+| 06  | 吴兰   | 1992-03-01 00:00:00 | 女   |
+| 07  | 郑竹   | 1989-07-01 00:00:00 | 女   |
+
+9. 查询和" 01 "号的同学学习的课程 完全相同的其他同学的信息
+
+10. 查询没学过"张三"老师讲授的任一门课程的学生姓名
